@@ -401,6 +401,8 @@ proc main() =
   let maxval = 500'u32 # TODO: make this a parameter
   try:
     var a = p.parse()
+    if a.help:
+      quit 0
   except UsageError as e:
     stderr.write_line(p.help)
     stderr.write_line(getCurrentExceptionMsg())

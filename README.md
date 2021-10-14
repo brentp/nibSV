@@ -43,6 +43,6 @@ Options:
 
 ## Contributors
 
-Brent Pedersen<sup>1</sup>, Christopher Dunn<sup>2</sup>, Eric Dawson<sup>3</sup>, Sairam Behera<sup>4>, Fritz Sedlazeck<sup>4</sup>, Peter Xie<sup>5</sup>, and Zev Kronenberg<sup>2</sup>
+Brent Pedersen<sup>1</sup>, Christopher Dunn<sup>2</sup>, Eric Dawson<sup>3</sup>, Sairam Behera<sup>4</sup>, Fritz Sedlazeck<sup>4</sup>, Peter Xie<sup>5</sup>, and Zev Kronenberg<sup>2</sup>
 
 <sup>1</sup> University of Utrecht; <sup>2</sup>PacBio; <sup>3</sup>Nvidia Corporation; <sup>4</sup>Baylor College of Medicine; <sup>5</sup>JBrowse (UC Berkeley);

@@ -216,8 +216,8 @@ proc remove_reference_kmers(svs:var seq[Sv], ex:Excluder) =
     sv.ref_kmers.remove(ex.refs_to_exclude)
     sv.alt_kmers.remove(ex.alts_to_exclude)
 
-proc to_kmer_cnt_table(svs: seq[Sv]): TableRef[uint64, int] =
-  result = newTable[uint64, int]()
+proc to_kmer_cnt_table(svs: seq[Sv]): TableRef[uint64, uint32] =
+  result = newTable[uint64, uint32]()
   for sv in svs:
     for k in sv.ref_kmers:
       when defined(check_unique_kmers):

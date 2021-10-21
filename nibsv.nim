@@ -24,8 +24,8 @@ const nibsvGitCommit* = staticExec("git rev-parse --verify HEAD")
 type Sv* = object
   chrom*: string
   pos*: int # 0-based position
-  k: uint8
-  space: seq[uint8]
+  k*: uint8
+  space*: seq[uint8]
   ref_allele*: string
   alt_allele*: string
   ref_kmers*:seq[uint64]
@@ -103,8 +103,8 @@ proc generate_ref_alt*(sv:var Sv, fai:Fai, overlap:uint8=6): tuple[ref_sequence:
     when defined(debug):
       doAssert sv.ref_allele in result.ref_sequence[i], $(sv.ref_allele, result.ref_sequence, sv.ref_allele.len, result.ref_sequence.len)
 
-    result.alt_sequence.add(result.ref_sequence[i][0 ..< (kmer_size - overlap)])
-    doAssert sv.ref_allele[0] == result.ref_sequence[i][(kmer_size - overlap)]
+    result.alt_sequence.add(result.ref_sequence[i][0 ..< max(0, kmer_size - overlap)])
+    doAssert sv.ref_allele[0] == result.ref_sequence[i][max(0, kmer_size - overlap)], &"reference allele does not match that from reference sequence. expecting: {result.ref_sequence[i][max(0, kmer_size - overlap)]}, got {sv.ref_allele[0]}"
     if sv.ref_allele.len == 1: # INS
       #if sv.alt_allele.len < 100:
       result.alt_sequence[i] &= sv.alt_allele

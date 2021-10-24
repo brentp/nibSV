@@ -37,11 +37,11 @@ type Sv* = object
   alt_allele*: string
   ref_kmers*:seq[uint64]
   alt_kmers*:seq[uint64]
+
   svtype: string # The SVTYPE, of which only DEL, INS, INV, TRA, DUP and BND will be considered valid.
   sv_len: int # SV length from the SVLEN field, if present
   sv_end: int # SV end from the END field, or calculated from the SVLEN + pos if present.
   sv_seq*: string # SV sequences, either from the SEQ field or calculated using the reference
-
 
   # these correspond to the counts of kmers seen for each kmer in ref and alt
   # kmers respectively.
@@ -105,6 +105,19 @@ proc update_kmers(sv:var Sv, ref_sequences:seq[string], alt_sequences:seq[string
 proc stop*(sv:Sv): int {.inline.} =
   result = sv.pos + sv.ref_allele.len
 
+proc sv_stop(sv:Sv): int {.inline.} =
+  if sv.sv_end != -1:
+    result = sv.sv_end.int
+  elif sv.sv_len != -1 and sv.sv_len != 0:
+    var t_len: int = sv.sv_len
+    if t_len < 0:
+      t_len = -1 * sv.sv_len.int
+    result = sv.pos + t_len - 1
+  else:
+    result = sv.pos + sv.ref_allele.len
+
+proc reverse_string(s: var string): string =
+  return s.reversed().join()
 
 proc parse_sv_allele*(sv_allele: string): Breakend =
   var first_parens_index: int = 0
@@ -146,7 +159,19 @@ proc generate_sv_sequences*(sv:var Sv, fai:Fai, kmer_size:int,  overlap:uint8, r
     var b: Breakend = parse_sv_allele(sv.alt_allele)
 
   else:
-    ref_seq = ( fai.get(sv.chrom, max(0, sv.pos - kmer_size + overlap), sv.stop + kmer_size - overlap))
+    ref_seq = ( fai.get(sv.chrom, max(0, sv.pos - kmer_size + overlap), sv.sv_stop + kmer_size - overlap))
+    if sv.sv_type == "INS":
+      alt_seq &= sv.alt_allele
+    elif sv.sv_type == "DEL":
+      alt_seq &= ref_seq[kmer_size - overlap]
+    elif sv.sv_type == "INV":
+      ## TODO: check that the indexing here is right.
+      alt_seq = reverse_string(ref_seq[kmer_size - overlap ..< ref_seq.len - kmer_size + overlap])
+      return
+    else:
+      echo "Unknown SV type" & sv.sv_type
+      return
+    
     return
 
 

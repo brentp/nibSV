@@ -166,7 +166,8 @@ proc generate_sv_sequences*(sv:var Sv, fai:Fai, kmer_size:int,  overlap:uint8, r
       alt_seq &= ref_seq[kmer_size - overlap]
     elif sv.sv_type == "INV":
       ## TODO: check that the indexing here is right.
-      alt_seq = reverse_string(ref_seq[kmer_size - overlap ..< ref_seq.len - kmer_size + overlap])
+      ref_seq = ref_seq[kmer_size - overlap ..< ref_seq.len - kmer_size + overlap]
+      alt_seq = reverse_string(ref_seq)
       return
     else:
       echo "Unknown SV type" & sv.sv_type

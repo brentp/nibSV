@@ -105,6 +105,7 @@ proc update_kmers(sv:var Sv, ref_sequences:seq[string], alt_sequences:seq[string
 proc stop*(sv:Sv): int {.inline.} =
   result = sv.pos + sv.ref_allele.len
 
+
 proc parse_sv_allele*(sv_allele: string): Breakend =
   var first_parens_index: int = 0
   var second_parens_index: int = sv_allele.len - 1
@@ -136,8 +137,20 @@ proc parse_sv_allele*(sv_allele: string): Breakend =
   result.pos = pos
   result.pre_bases = pre_bases
   result.post_bases = post_bases
-  
-  
+
+proc generate_sv_sequences*(sv:var Sv, fai:Fai, kmer_size:int,  overlap:uint8, ref_seq:var string, alt_seq:var string) = 
+  let overlap = overlap.int
+  if sv.sv_type == "BND":
+    ## breakends require special handling,
+    ## as they may have ends from two chromosomes.
+    var b: Breakend = parse_sv_allele(sv.alt_allele)
+
+  else:
+    ref_seq = ( fai.get(sv.chrom, max(0, sv.pos - kmer_size + overlap), sv.stop + kmer_size - overlap))
+    return
+
+
+
 proc generate_ref_alt*(sv:var Sv, fai:Fai, overlap:uint8=6): tuple[ref_sequence:seq[string], alt_sequence:seq[string]] =
   let overlap = overlap.int
 
@@ -157,7 +170,7 @@ proc generate_ref_alt*(sv:var Sv, fai:Fai, overlap:uint8=6): tuple[ref_sequence:
       result.alt_sequence[i] &= sv.alt_allele
       #else:
       #  result.alt_sequence[i] &= sv.alt_allele[0..(kmer_size + 10)] & repeat('N', kmer_size) & sv.alt_allele[^(sv.alt_allele.len - kmer_size - 10)..<sv.alt_allele.len]
-    else:
+    elif sv.sv_type == "DEL":
     # NOTE: this doesn't work for REF and ALT lengths > 1
       result.alt_sequence[i] &= result.ref_sequence[i][kmer_size - overlap]
 

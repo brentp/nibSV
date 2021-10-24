@@ -31,8 +31,8 @@ type Breakend* = object
 type Sv* = object
   chrom*: string
   pos*: int # 0-based position
-  k: uint8
-  space: seq[uint8]
+  k*: uint8
+  space*: seq[uint8]
   ref_allele*: string
   alt_allele*: string
   ref_kmers*:seq[uint64]
@@ -64,7 +64,7 @@ proc kmer_size(sv:Sv): seq[int] =
     result.add(sv.k.int + s.int + int(s > 0) * sv.k.int)
   if result.len == 0: result.add(sv.k.int)
 
-proc update_kmers(sv:var Sv, ref_sequences:seq[string], alt_sequences:seq[string], step:int) =
+proc update_kmers(sv:var Sv, ref_sequences:seq[string], alt_sequences:seq[string]) =
   # find unique ref and alt kmers.
   var refs = initHashSet[uint64]()
   var alts = initHashSet[uint64]()
@@ -163,9 +163,12 @@ proc generate_ref_alt*(sv:var Sv, fai:Fai, overlap:uint8=6): tuple[ref_sequence:
     when defined(debug):
       doAssert sv.ref_allele in result.ref_sequence[i], $(sv.ref_allele, result.ref_sequence, sv.ref_allele.len, result.ref_sequence.len)
 
-    result.alt_sequence.add(result.ref_sequence[i][0 ..< (kmer_size - overlap)])
-    doAssert sv.ref_allele[0] == result.ref_sequence[i][(kmer_size - overlap)]
-    if sv.sv_type == "INS": # INS
+    # result.alt_sequence.add(result.ref_sequence[i][0 ..< (kmer_size - overlap)])
+    # doAssert sv.ref_allele[0] == result.ref_sequence[i][(kmer_size - overlap)]
+    # if sv.sv_type == "INS": # INS
+    result.alt_sequence.add(result.ref_sequence[i][0 ..< max(0, kmer_size - overlap)])
+    doAssert sv.ref_allele[0] == result.ref_sequence[i][max(0, kmer_size - overlap)], &"reference allele does not match that from reference sequence. expecting: {result.ref_sequence[i][max(0, kmer_size - overlap)]}, got {sv.ref_allele[0]}"
+    if sv.ref_allele.len == 1: # INS
       #if sv.alt_allele.len < 100:
       result.alt_sequence[i] &= sv.alt_allele
       #else:
@@ -185,9 +188,9 @@ proc generate_ref_alt*(sv:var Sv, fai:Fai, overlap:uint8=6): tuple[ref_sequence:
         doAssert sv.alt_allele in result.alt_sequence[i], $(sv.alt_allele, result.alt_sequence, sv.alt_allele.len, result.alt_sequence.len, sv)
 
 
-proc generate_kmers*(sv:var Sv, fai:Fai, step:int) =
+proc generate_kmers*(sv:var Sv, fai:Fai) =
   let (ref_sequences, alt_sequences) = sv.generate_ref_alt(fai)
-  sv.update_kmers(ref_sequences, alt_sequences, step)
+  sv.update_kmers(ref_sequences, alt_sequences)
 
 proc get_all_kmers(svs:seq[Sv]): tuple[ref_kmers: HashSet[uint64], alt_kmers: HashSet[uint64], exclude: HashSet[uint64]] =
   # kmers are stored in each sv. we sometimes need them all together.
@@ -281,8 +284,8 @@ proc remove_reference_kmers(svs:var seq[Sv], ex:Excluder) =
     sv.ref_kmers.remove(ex.refs_to_exclude)
     sv.alt_kmers.remove(ex.alts_to_exclude)
 
-proc to_kmer_cnt_table(svs: seq[Sv]): TableRef[uint64, int] =
-  result = newTable[uint64, int]()
+proc to_kmer_cnt_table(svs: seq[Sv]): TableRef[uint64, uint32] =
+  result = newTable[uint64, uint32]()
   for sv in svs:
     for k in sv.ref_kmers:
       when defined(check_unique_kmers):
@@ -455,9 +458,8 @@ proc main() =
 
   var p = newParser("nibsv"):
     option("-k", default="27", help="kmer-size must be <= 15 if space > 0 else 31")
-    option("--space", default="", help="space between kmers", multiple=true)
+    option("--space", default="", help="space between kmers (may be specified multiple times)", multiple=true)
     flag("--use-med", help="use median instead of max for choosing kmer count")
-    option("--step", default="1", help="step between generated reference kmers (larger values save more memory)")
     option("-o", default="nibsv.vcf.gz", help="output vcf")
     option("--cram-ref", help="optional reference fasta file for cram if difference from reference fasta")
     arg("vcf", help="SV vcf with sites to genotype")
@@ -467,6 +469,8 @@ proc main() =
   let maxval = 500'u32 # TODO: make this a parameter
   try:
     var a = p.parse()
+    if a.help:
+      quit 0
   except UsageError as e:
     stderr.write_line(p.help)
     stderr.write_line(getCurrentExceptionMsg())
@@ -490,7 +494,6 @@ proc main() =
     spaces.add(space.uint8)
   if spaces.len == 0: spaces.add(0'u8)
   var ibam:Bam
-  let step = parseInt(a.step)
   if a.cram_ref == "":
     a.cram_ref = a.ref
   if not ibam.open(a.bam, threads=2, fai=a.cram_ref, index=true):
@@ -528,7 +531,7 @@ proc main() =
 
     # we have to skip bad variants. but leave them in so we keep the order.
     if v.ALT[0][0] == v.REF[0]: # and (v.ALT[0].len > ml or v.REF.len > ml):
-      sv.generate_kmers(fai, step)
+      sv.generate_kmers(fai)
     svs.add(sv)
 
   ivcf.close()

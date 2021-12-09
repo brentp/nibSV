@@ -7,6 +7,7 @@ import strutils
 import algorithm
 import hts
 import kmer
+import ./nibsvpkg/genotype
 
 #[
 steps:
@@ -333,8 +334,14 @@ proc write(svs: seq[Sv], ivcf:VCF, output_path:string, sample_name:string, maxva
   discard ovcf.header.add_format("NIAK", "1", "String", "nibsv: alternate kmer (this and reverse-complement are used)")
   discard ovcf.header.add_format("NIR", "1", "Integer", "nibsv: max reference counts. a value of -1 means that there were no suitable ref kmers for this sv")
   discard ovcf.header.add_format("NIA", "1", "Integer", "nibsv: max alternate counts. a value of -1 means that there were no suitable alt kmers for this sv")
+  discard ovcf.header.add_format("GL", ".", "Float", "nibsv genotype likelihoods")
+  discard ovcf.header.add_format("nibsvGT", "1", "String", "nibsv genotype")
+  discard ovcf.header.add_format("GQ", "1", "Integer", "nibsv genotype quality")
+
   ovcf.add_sample(sample_name)
   doAssert ovcf.write_header()
+  let priors = [1e-3, 0.5, 0.9]
+
 
   var i = 0
   for variant in ivcf:
@@ -350,7 +357,16 @@ proc write(svs: seq[Sv], ivcf:VCF, output_path:string, sample_name:string, maxva
     let alt_max = if use_med: sv.alt_counts.argmed(maxval=maxval) else: sv.alt_counts.argmax(maxval=maxval)
     kms = @[get_ith_kmer(sv.alt_kmers, sv.k.int, sv.space[0].int, alt_max)]
     var max_alt = if sv.alt_counts.len > 0 and alt_max >= 0: @[sv.alt_counts[alt_max].int32] else: @[-1'i32]
+    
     doAssert variant.format.set("NIA", max_alt) == Status.OK
+
+    let gt = bayes_gt(max_ref[0], max_alt[0], priors)
+
+    var geno = gt.genotype
+    var gq = @[geno.GQ.int32]
+    doAssert variant.format.set("GQ", gq) == Status.OK
+    var ngt = @[ ["0/0", "0/1", "1/1", "./."][if geno.gt == -1: 3 else: geno.gt] ]
+    doAssert variant.format.set("nibsvGT", ngt) == Status.OK
 
     if kms[0] != "":
       doAssert variant.format.set("NIAK", kms) == Status.OK
